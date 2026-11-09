@@ -1,0 +1,10 @@
+{
+  "analysis.mode": "full",
+  "analysis.debugInfo.internal": false,
+  "analysis.debugInfo.enableDebugDirectories": false,
+  "analysis.debugInfo.loadSiblingDebugFiles": false,
+  "analysis.linearSweep.controlFlowGraph": false,
+  "analysis.workflows.functionWorkflow": "matteroverwatch.xtensa.loops",
+  "arch.xtensa.windowVectorProfile": "generic",
+  "arch.xtensa.depcPresence": "unknown"
+}

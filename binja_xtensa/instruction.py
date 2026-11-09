@@ -301,7 +301,7 @@ class Instruction:
         2: ("LCOUNT",        4),
         3: ("SAR",           1),
         4: ("BR",            4),
-        5: ("LITBASE",       3),
+        5: ("LITBASE",       4),
         12: ("SCOMPARE1",    4),
         16: ("ACCLO",        4),
         17: ("ACCHI",        1),
@@ -309,8 +309,8 @@ class Instruction:
         33: ("M1",           4),
         34: ("M2",           4),
         35: ("M3",           4),
-        72: ("WindowBase",   1),
-        73: ("WindowStart",  2),
+        72: ("WindowBase",   4),
+        73: ("WindowStart",  4),
         83: ("PTEVADDR",     4),
         89: ("MMID",         4),
         90: ("RASID",        4),
@@ -357,7 +357,7 @@ class Instruction:
         226: ("INTERRUPT",   4), # Also known as INTSET
         227: ("INTCLEAR",    4),
         228: ("INTENABLE",   4),
-        230: ("PS",          2),
+        230: ("PS",          4),
         231: ("VECBASE",     4),
         232: ("EXCCAUSE",    1),
         233: ("DEBUGCAUSE",  2),
@@ -405,7 +405,13 @@ class Instruction:
     @classmethod
     def decode(cls, insn_bytes):
         insn = Instruction()
-        return cls._do_tbl_layer(insn, insn_bytes, "op0", cls._op0_map)
+        result = cls._do_tbl_layer(insn, insn_bytes, "op0", cls._op0_map)
+        # Safety belt: guarantee a valid length so BN never hangs on
+        # length=0.  Xtensa instructions are exactly 2 (narrow) or 3 bytes.
+        if result is not None and (result.length is None or result.length <= 0
+                                   or result.length > 3):
+            result.length = 3
+        return result
 
     # At each "layer" of the tables, we look up some control signal. In this
     # case, it was op0. op0 has 4 bits for a 16 entry table. We can do one of
@@ -490,15 +496,25 @@ class Instruction:
     def _call_from_map(map, index, insn, insn_bytes):
         """Part of the operation of _do_lut, see there for comments"""
         try:
-            name = "_decode_" + map[index]
+            entry = map[index]
         except IndexError:
-            raise Exception(f"Unsupported index {index} in map {map}")
-        # except:
-        #     print(f"[EXCEPTION] No configuration for bytes {insn_bytes.hex()} --> index {index} in map {map}")
+            entry = None
+        # Reserved / unimplemented opcode slot — mark invalid so the
+        # decoder returns a length-3 fallback instead of crashing.
+        if entry is None:
+            insn.valid = False
+            insn.length = 3
+            insn.mnem = "ILL"
+            return insn
+
+        name = "_decode_" + entry
 
         func = getattr(Instruction, name, None)
         if not func:
-            raise Exception(f"Unimplemented: {name} -  bytes: {insn_bytes.hex()}")
+            insn.valid = False
+            insn.length = 3
+            insn.mnem = "ILL"
+            return insn
 
         return func(insn, insn_bytes)
 
@@ -641,7 +657,7 @@ class Instruction:
     _decode_RFME = mnem("RFME", "RRR", lambda insn: insn.s == 0)
 
     _rfet_map = [
-        "RFE", "RFUI", "RFDE", None, # None is reserved
+        "RFE", "RFUE", "RFDE", None, # None is reserved
         "RFWO", "RFWU", None, None,
         None, None, None, None,
         None, None, None, None,
@@ -652,7 +668,7 @@ class Instruction:
         return cls._do_tbl_layer(insn, insn_bytes, "s", cls._rfet_map)
 
     _decode_RFE = mnem("RFE", "RRR")
-    _decode_RFUI = mnem("RFUI", "RRR")
+    _decode_RFUE = mnem("RFUE", "RRR")
     _decode_RFDE = mnem("RFDE", "RRR")
     _decode_RFWO = mnem("RFWO", "RRR")
     _decode_RFWU = mnem("RFWU", "RRR")
@@ -672,7 +688,7 @@ class Instruction:
     _decode_SSL = mnem("SSL", "RRR", lambda insn: insn.t == 0)
     _decode_SSA8L = mnem("SSA8L", "RRR", lambda insn: insn.t == 0)
     _decode_SSA8B = mnem("SSA8B", "RRR", lambda insn: insn.t == 0)
-    _decode_SSAI = mnem("SSAI", "RRR", lambda insn: insn.t == 0,
+    _decode_SSAI = mnem("SSAI", "RRR", lambda insn: insn.t < 2,
                         inline0=lambda insn, _: insn.s + ((insn.t & 1) << 4) )
     _decode_RER = mnem("RER", "RRR")
     _decode_WER = mnem("WER", "RRR")
@@ -793,7 +809,7 @@ class Instruction:
 
     _rst2_map = [
         "ANDB", "ANDBC", "ORB", "ORBC",
-        "XORB", None, None, None,
+        "XORB", None, "SALTU", "SALT",
         "MULL", None, "MULUH", "MULSH",
         "QUOU", "QUOS", "REMU", "REMS",
     ]
@@ -807,6 +823,8 @@ class Instruction:
     _decode_ORB = mnem("ORB", "RRR")
     _decode_ORBC = mnem("ORBC", "RRR")
     _decode_XORB = mnem("XORB", "RRR")
+    _decode_SALT = mnem("SALT", "RRR")
+    _decode_SALTU = mnem("SALTU", "RRR")
     _decode_MULL = mnem("MULL", "RRR")
     _decode_MULUH = mnem("MULUH", "RRR")
     _decode_MULSH = mnem("MULSH", "RRR")
@@ -873,7 +891,8 @@ class Instruction:
 
     _decode_L32E = mnem("L32E", "RRI4",
                         inline0=lambda insn, _: (insn.r << 2) - 64)
-    _decode_S32E = mnem("S32E", "RRI4")
+    _decode_S32E = mnem("S32E", "RRI4",
+                        inline0=lambda insn, _: (insn.r << 2) - 64)
 
     _fp0_map = [
         "ADD_S", "SUB_S", "MUL_S", None, # None is reserved
@@ -1056,21 +1075,82 @@ class Instruction:
     @classmethod
     def _decode_MAC16(cls, insn, insn_bytes):
         # format RRR (t, s, r, op1 vary)
+        insn.op1 = decode_op1(insn_bytes)
         return cls._do_tbl_layer(insn, insn_bytes, "op2", cls._mac16_map)
 
 
 
-    # MAC16 STUFF:
-    
-    _macdd_map = [
-        None, None, None, None,
-        "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL",
-        "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL",
-        "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL", "MULL_DD_LL",
-    ]
-    
-    # TODO: Skipping this MAC stuff, seems like a vector processor, that I doubt
-    # the ESP8266 has... 
+    # Standalone MAC16 loads: op1=0, r selects M0..M3, t is reserved.
+    _decode_MACI = mnem("LDINC", "RRR", lambda insn: insn.op1 == 0 and insn.r < 4 and insn.t == 0)
+    _decode_MACC = mnem("LDDEC", "RRR", lambda insn: insn.op1 == 0 and insn.r < 4 and insn.t == 0)
+
+    @classmethod
+    def _decode_mac_arithmetic(cls, insn, insn_bytes, kind):
+        cls._decode_fmt_RRR(insn, insn_bytes)
+        insn.mac_kind = kind
+        insn.mac_half = insn.op1 & 3
+        insn.mac_operation = ("UMUL", "MUL", "MULA", "MULS")[insn.op1 >> 2]
+        insn.mnem = insn.mac_operation + "." + kind + "." + ("LL", "HL", "LH", "HH")[insn.mac_half]
+        insn.valid = (insn.op1 >= 4 or kind == "AA")
+        if kind[0] == "A":
+            insn.valid &= insn.r == 0
+            insn.mac_left = "a" + str(insn.s)
+        else:
+            insn.valid &= insn.s == 0 and insn.r in (0, 4)
+            insn.mac_left = "m" + str(insn.r >> 2)
+        if kind[1] == "A":
+            insn.mac_right = "a" + str(insn.t)
+        else:
+            insn.valid &= insn.t in (0, 4)
+            insn.mac_right = "m" + str(2 + (insn.t >> 2))
+        return insn
+
+    @classmethod
+    def _decode_MACAA(cls, insn, data):
+        return cls._decode_mac_arithmetic(insn, data, "AA")
+
+    @classmethod
+    def _decode_MACAD(cls, insn, data):
+        return cls._decode_mac_arithmetic(insn, data, "AD")
+
+    @classmethod
+    def _decode_MACDA(cls, insn, data):
+        return cls._decode_mac_arithmetic(insn, data, "DA")
+
+    @classmethod
+    def _decode_MACDD(cls, insn, data):
+        return cls._decode_mac_arithmetic(insn, data, "DD")
+
+    @classmethod
+    def _decode_mac_compound(cls, insn, data, kind, delta):
+        cls._decode_fmt_RRR(insn, data)
+        insn.mac_kind = kind
+        insn.mac_half = insn.op1 & 3
+        insn.mac_operation = "MULA"
+        insn.mac_load_delta = delta
+        insn.mac_destination = "m" + str(insn.r & 3)
+        insn.mac_base = "a" + str(insn.s)
+        insn.mac_left = "m" + str(insn.r >> 2)
+        insn.mac_right = "a" + str(insn.t) if kind == "DA" else "m" + str(2 + (insn.t >> 2))
+        insn.mnem = "MULA." + kind + "." + ("LL", "HL", "LH", "HH")[insn.mac_half] + (".LDINC" if delta > 0 else ".LDDEC")
+        insn.valid = 8 <= insn.op1 <= 11 and insn.r < 8 and (kind == "DA" or insn.t in (0, 4))
+        return insn
+
+    @classmethod
+    def _decode_MACIA(cls, insn, data):
+        return cls._decode_mac_compound(insn, data, "DA", 4)
+
+    @classmethod
+    def _decode_MACCA(cls, insn, data):
+        return cls._decode_mac_compound(insn, data, "DA", -4)
+
+    @classmethod
+    def _decode_MACID(cls, insn, data):
+        return cls._decode_mac_compound(insn, data, "DD", 4)
+
+    @classmethod
+    def _decode_MACCD(cls, insn, data):
+        return cls._decode_mac_compound(insn, data, "DD", -4)
 
     _calln_map = [
         "CALL0", "CALL4", "CALL8", "CALL12",

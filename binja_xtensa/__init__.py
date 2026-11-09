@@ -68,6 +68,7 @@ class XtensaLE(Architecture):
     default_int_size = 4
     address_size = 4
     max_instr_length = 3
+    instr_alignment = 1  # Xtensa allows byte-aligned instructions (24-bit + 16-bit narrow)
 
     # Uses for regs are from "CALL0 Register Usage and Stack Layout (8.1.2)"
     link_reg = 'a0'
@@ -100,9 +101,31 @@ class XtensaLE(Architecture):
     for i in range(16):
         regs[f"f{i}"] = RegisterInfo(f"f{i}", 4, 0)
     # Boolean registers - Chapter 4.3.10
-    # Theoretically 16 1-bit register, represented as 1 16-bit register, but makes decompilation unclear    
+    # Theoretically 16 1-bit register, represented as 1 16-bit register, but makes decompilation unclear
     for i in range(16):
         regs[f"b{i}"] = RegisterInfo(f"b{i}", 1, 0)
+
+    # Physical AR register file — 64 entries (Chapter 4.3.4, Table 4–155).
+    # a0–a15 are a sliding window into ar0–ar63, offset by WINDOWBASE.
+    for i in range(64):
+        regs[f"ar{i}"] = RegisterInfo(f"ar{i}", 4, 0)
+
+    regs['bank_top'] = RegisterInfo('bank_top', 4, 0)
+    reg_stacks = {'physical_ar': RegisterStackInfo([f'ar{i}' for i in range(64)], [], 'bank_top')}
+
+    for vector in ('windowoverflow4','windowoverflow8','windowoverflow12',
+                   'windowunderflow4','windowunderflow8','windowunderflow12',
+                   'userexception','kernelexception','doubleexception'):
+        regs[vector] = RegisterInfo(vector, 4, 0)
+
+    regs['config_ndepc'] = RegisterInfo('config_ndepc', 1, 0)
+
+    # Window management registers (used by ENTRY/RETW/CALL8/CALL12 lifting).
+    # WINDOWBASE (SR 72): physical register index of the current a0.
+    # WINDOWSTART (SR 73): bitmask of valid windows (bit N set iff the window
+    #   starting at physical register N*4 is valid).
+    regs['windowbase'] = RegisterInfo('windowbase', 1, 0)
+    regs['windowstart'] = RegisterInfo('windowstart', 4, 0)
 
     sr_map = Instruction._special_reg_map
     for i in range(256):
@@ -131,6 +154,12 @@ class XtensaLE(Architecture):
 
     intrinsics = {
         # Core Architecture
+        "read_external_register": IntrinsicInfo(
+            [IntrinsicInput(types.Type.int(4, False), "address")],
+            [types.Type.int(4, False)]),
+        "write_external_register": IntrinsicInfo(
+            [IntrinsicInput(types.Type.int(4, False), "address"),
+             IntrinsicInput(types.Type.int(4, False), "value")], []),
         "memw": IntrinsicInfo([], []),
         "isync": IntrinsicInfo([], []),
         "dsync": IntrinsicInfo([], []),
@@ -142,31 +171,31 @@ class XtensaLE(Architecture):
         "debug_break": IntrinsicInfo([], []),
 
         # Data Cache Option
-        "data_cache_hit_invalidate": IntrinsicInfo([], []),
-        "data_cache_hit_writeback": IntrinsicInfo([], []),
-        "data_cache_hit_writeback_invalidate": IntrinsicInfo([], []),
-        "data_cache_index_invalidate": IntrinsicInfo([], []),
-        "data_cache_index_writeback": IntrinsicInfo([], []),
-        "data_cache_index_writeback_invalidate": IntrinsicInfo([], []),
-        "data_cache_prefetch_for_read": IntrinsicInfo([], []),
-        "data_cache_prefetch_for_read_once": IntrinsicInfo([], []),
-        "data_cache_prefetch_for_write": IntrinsicInfo([], []),
-        "data_cache_prefetch_for_write_once": IntrinsicInfo([], []),
+        "data_cache_hit_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_hit_writeback": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_hit_writeback_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_index_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_index_writeback": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_index_writeback_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_prefetch_for_read": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_prefetch_for_read_once": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_prefetch_for_write": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_prefetch_for_write_once": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
 
         # Data Cache Index Option
-        "data_cache_hit_unlock": IntrinsicInfo([], []),
-        "data_cache_index_unlock": IntrinsicInfo([], []),
-        "data_cache_prefetch_and_lock": IntrinsicInfo([], []),
+        "data_cache_hit_unlock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_index_unlock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "data_cache_prefetch_and_lock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
     
         # Instruction Cache Option
-        "instruction_cache_hit_invalidate": IntrinsicInfo([], []),
-        "instruction_cache_index_invalidate": IntrinsicInfo([], []),
-        "instruction_cache_prefetch": IntrinsicInfo([], []),
+        "instruction_cache_hit_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "instruction_cache_index_invalidate": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "instruction_cache_prefetch": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
 
         # Instruction Cache Index Lock Option
-        "instruction_cache_hit_unlock": IntrinsicInfo([], []),
-        "instruction_cache_index_unlock": IntrinsicInfo([], []),
-        "instruction_cache_prefetch_and_lock": IntrinsicInfo([], []),
+        "instruction_cache_hit_unlock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "instruction_cache_index_unlock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "instruction_cache_prefetch_and_lock": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
 
         # Debug and Exception Option 
         "exception_wait": IntrinsicInfo([], []),
@@ -174,36 +203,36 @@ class XtensaLE(Architecture):
         "return_from_debug_operation": IntrinsicInfo([], []),    
     
         # Region Protection option
-        "invalidate_data_TLB_entry": IntrinsicInfo([], []),
-        "invalidate_instruciton_TLB_entry": IntrinsicInfo([], []),
+        "invalidate_data_TLB_entry": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
+        "invalidate_instruciton_TLB_entry": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], []),
     
         # Region Translation Option (page 156)
         # MMU Option (page 158)
-        "probe_data_TLB": IntrinsicInfo([], []),
-        "probe_instruction_TLB": IntrinsicInfo([], []),
-        "read_data_TLB_entry_virtual": IntrinsicInfo([], []),
-        "read_data_TLB_entry_translation": IntrinsicInfo([], []),
-        "read_instruction_TLB_entry_virtual": IntrinsicInfo([], []),
-        "read_instruction_TLB_entry_translation": IntrinsicInfo([], []),
-        "write_data_TLB_entry": IntrinsicInfo([], []),
-        "write_instruction_TLB_entry": IntrinsicInfo([], []),
+        "probe_data_TLB": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "probe_instruction_TLB": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "read_data_TLB_entry_virtual": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "read_data_TLB_entry_translation": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "read_instruction_TLB_entry_virtual": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "read_instruction_TLB_entry_translation": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "write_data_TLB_entry": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1")], []),
+        "write_instruction_TLB_entry": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1")], []),
 
         # Instruction Cache Test Option
-        "load_instruction_cache_tag": IntrinsicInfo([], []),
-        "load_instruction_cache_word": IntrinsicInfo([], []),
-        "store_instruction_cache_tag": IntrinsicInfo([], []),
-        "store_instruction_cache_word": IntrinsicInfo([], []),
+        "load_instruction_cache_tag": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "load_instruction_cache_word": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "store_instruction_cache_tag": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1")], []),
+        "store_instruction_cache_word": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1")], []),
 
         #  Data Cache Test Option
-        "load_data_cache_tag": IntrinsicInfo([], []),
-        "store_data_cache_tag": IntrinsicInfo([], []),
+        "load_data_cache_tag": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "store_data_cache_tag": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1")], []),
 
         # Conditional Store Option
-        "store_32bit_compare_conditional": IntrinsicInfo([], []),
+        "store_32bit_compare_conditional": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0"), IntrinsicInput(types.Type.int(4, False), "arg1"), IntrinsicInput(types.Type.int(4, False), "arg2")], [types.Type.int(4, False)]),
 
         # Miscelaneaous Operations Option - Placeholders
-        "normalization_shift_amount": IntrinsicInfo([], []),
-        "normalization_shift_amount_unsigned": IntrinsicInfo([], []),
+        "normalization_shift_amount": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
+        "normalization_shift_amount_unsigned": IntrinsicInfo([IntrinsicInput(types.Type.int(4, False), "arg0")], [types.Type.int(4, False)]),
 
         # Multiprocessor Synchronization Option 
         "acquire": IntrinsicInfo([], []),
@@ -213,43 +242,62 @@ class XtensaLE(Architecture):
         insn = None
         try:
             insn = Instruction.decode(data)
+            # Honor decoder validity for every opcode family, including MAC16
+            # loads whose invalid operands can name nonexistent MR registers.
+            # Unsupported/reserved slots are unknown, not implemented ILL traps.
+            if insn is not None and insn.valid is False:
+                return None
         except:
             pass
         return insn
 
     def get_instruction_info(self, data, addr):
+        # Instruction information must be a pure function of bytes/address.
+        # BN revisits addresses across analyses and views; global visit guards
+        # corrupt instruction lengths and CFG edges on those legitimate calls.
         insn = self._decode_instruction(data, addr)
         if not insn:
             return None
         result = InstructionInfo()
-        result.length = insn.length
-        if insn.length > 3 or insn.length < 0:
-            raise Exception("Somehow we got here without setting length")
+        length = insn.length
+        if length is None or length <= 0 or length > 3:
+            length = 3
+        result.length = length
 
         # Add branches
         if insn.mnem in ["RET", "RET.N", "RETW", "RETW.N"]:
             result.add_branch(BranchType.FunctionReturn)
         # Returns from interrups or exceptions
-        elif insn.mnem in ["RFI", "RFME", "RFWO", "RFE", "RFDE", "RFUE"]:
+        elif insn.mnem in ("RFUE", "ILL", "ILL.N", "SYSCALL"):
+            result.add_branch(BranchType.ExceptionBranch)
+        elif insn.mnem in ["RFI", "RFME", "RFWO", "RFWU", "RFE", "RFDE"]:
             result.add_branch(BranchType.FunctionReturn)
         # Section 3.8.4 "Jump and Call Instructions
         elif insn.mnem in ["J"]:
-            result.add_branch(BranchType.UnconditionalBranch,
-                              insn.target_offset(addr))
+            target = insn.target_offset(addr)
+            # A self-loop is valid executable control flow.
+            if target is not None:
+                result.add_branch(BranchType.UnconditionalBranch, target)
         elif insn.mnem in ["JX"]:
             result.add_branch(BranchType.IndirectBranch)
         elif insn.mnem in ["CALL0", "CALL4", "CALL8", "CALL12"]:
-            result.add_branch(BranchType.CallDestination,
-                              insn.target_offset(addr))
+            target = insn.target_offset(addr)
+            if target is not None:
+                result.add_branch(BranchType.CallDestination, target)
         elif insn.mnem in ["CALLX0", "CALLX4", "CALLX8", "CALLX12"]:
             result.add_branch(BranchType.IndirectBranch)
-        elif insn.mnem in ["SYSCALL"]:
-            result.add_branch(BranchType.SystemCall)
+        elif insn.mnem in ["LOOPNEZ", "LOOPGTZ"]:
+            result.add_branch(BranchType.TrueBranch, addr + 4 + insn.imm8)
+            result.add_branch(BranchType.FalseBranch, addr + length)
+        elif insn.mnem == "LOOP":
+            result.add_branch(BranchType.UnconditionalBranch, addr + length)
 
         elif insn.mnem.replace(".", "_") in [k for k in Instruction._target_offset_map.keys() if
                            k.startswith("B")]: # lol
-            result.add_branch(BranchType.TrueBranch, insn.target_offset(addr))
-            result.add_branch(BranchType.FalseBranch, addr + insn.length)
+            target = insn.target_offset(addr)
+            if target is not None:
+                result.add_branch(BranchType.TrueBranch, target)
+            result.add_branch(BranchType.FalseBranch, addr + length)
 
         return result
 
@@ -277,6 +325,26 @@ class XtensaCall0CallingConvention(CallingConvention):
     high_int_return_reg = "a3"
 
 
+def fix_xtensa_sections(bv):
+    """Post-load fix: reclassify .literal sections as read-only data.
+
+    Xtensa ELFs use a .literal section (literal pool for L32R).  The ELF
+    loader may mark it executable because it lives in a text segment.
+    Reclassifying avoids the analyzer creating false functions in the
+    literal pool and reduces analysis noise.
+    """
+    from binaryninja.enums import SectionSemantics
+    for section_name in ('.literal', '.lit4', '.lit8'):
+        sec = bv.get_section_by_name(section_name)
+        if sec is not None:
+            bv.add_auto_section(
+                section_name,
+                sec.start,
+                sec.end - sec.start,
+                SectionSemantics.ReadOnlyDataSectionSemantics,
+            )
+
+
 def register_stuff():
     XtensaLE.register()
 
@@ -295,3 +363,5 @@ def register_stuff():
 
 
 register_stuff()
+
+from .elf_entry import initialize_elf_entry

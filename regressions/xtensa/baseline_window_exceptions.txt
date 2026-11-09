@@ -1,0 +1,73 @@
+"""WindowCheck from Xtensa ISA, with configured vector addresses as inputs."""
+from binaryninja import LowLevelILLabel, LLIL_TEMP
+from .window_bank import rotate_bank
+
+
+def window_bit(il, displacement):
+    index = il.and_expr(4, il.add(4, il.reg(4, 'windowbase'), il.const(4, displacement)), il.const(4, 15))
+    return il.compare_not_equal(4, il.and_expr(4,
+        il.logical_shift_right(4, il.reg(4, 'windowstart'), index), il.const(4, 1)), il.const(4, 0))
+
+
+def window_check(il, maximum_group, address):
+    normal, inspect, exception = LowLevelILLabel(), LowLevelILLabel(), LowLevelILLabel()
+    enabled = il.compare_equal(4, il.and_expr(4, il.reg(4, 'ps'), il.const(4, 0x40010)), il.const(4, 0x40000))
+    il.append(il.if_expr(enabled, inspect, normal));il.mark_label(inspect)
+    for group in (1,2,3):
+        hit, next_group = LowLevelILLabel(), LowLevelILLabel()
+        condition = il.and_expr(1, il.compare_unsigned_greater_equal(4, maximum_group, il.const(4, group)), window_bit(il, group))
+        il.append(il.if_expr(condition, hit, next_group));il.mark_label(hit)
+        il.append(il.set_reg(4, LLIL_TEMP(25), il.const(4, group)))
+        il.append(il.goto(exception));il.mark_label(next_group)
+    il.append(il.goto(normal));il.mark_label(exception)
+    il.append(il.set_reg(4, 'ps', il.or_expr(4,
+        il.or_expr(4, il.and_expr(4, il.reg(4, 'ps'), il.const(4, 0xfffff0ff)),
+                   il.shift_left(4, il.reg(4, 'windowbase'), il.const(1, 8))), il.const(4, 16))))
+    il.append(il.set_reg(4, 'epc1', il.const_pointer(4, address)))
+    rotate_bank(il, il.add(4, il.reg(4, 'windowbase'), il.reg(4, LLIL_TEMP(25))))
+    for offset, vector in ((1,4),(2,8)):
+        hit, next_vector=LowLevelILLabel(),LowLevelILLabel()
+        il.append(il.if_expr(window_bit(il, offset),hit,next_vector));il.mark_label(hit)
+        il.append(il.jump(il.reg(4,'windowoverflow'+str(vector))));il.mark_label(next_vector)
+    il.append(il.jump(il.reg(4,'windowoverflow12')))
+    il.mark_label(normal)
+
+
+def window_return(il, address):
+    """RETW with ABI-local normal return and physical-bank underflow transfer."""
+    il.append(il.set_reg(4, LLIL_TEMP(20), il.or_expr(4,
+        il.and_expr(4, il.reg(4, 'a0'), il.const(4, 0x3fffffff)), il.const(4, address & 0xc0000000))))
+    il.append(il.set_reg(4, LLIL_TEMP(21), il.reg(4, 'windowbase')))
+    il.append(il.set_reg(4, LLIL_TEMP(22), il.logical_shift_right(4, il.reg(4, 'a0'), il.const(1, 30))))
+    valid, invalid, check = LowLevelILLabel(), LowLevelILLabel(), LowLevelILLabel()
+    condition=il.and_expr(1,
+        il.compare_equal(4, il.and_expr(4, il.reg(4, 'ps'), il.const(4, 0x40010)), il.const(4, 0x40000)),
+        il.compare_not_equal(4, il.reg(4, LLIL_TEMP(22)), il.const(4, 0)))
+    il.append(il.if_expr(condition, check, invalid));il.mark_label(check)
+    # The nearest live predecessor must be the encoded caller window.
+    for distance in (1,2,3):
+        found, onward=LowLevelILLabel(),LowLevelILLabel()
+        il.append(il.if_expr(window_bit(il, -distance), found, onward));il.mark_label(found)
+        il.append(il.if_expr(il.compare_equal(4, il.reg(4, LLIL_TEMP(22)), il.const(4, distance)),valid,invalid))
+        il.mark_label(onward)
+    underflow=LowLevelILLabel()
+    il.append(il.goto(underflow));il.mark_label(invalid)
+    il.append(il.trap(0))  # ISA permits illegal-instruction handling for undefined states.
+    il.mark_label(valid)
+    mask=il.shift_left(4,il.const(4,1),il.reg(4,'windowbase'))
+    il.append(il.set_reg(4,'windowstart',il.and_expr(4,il.reg(4,'windowstart'),il.xor_expr(4,mask,il.const(4,0xffffffff)))))
+    il.append(il.set_reg(4,'windowbase',il.and_expr(4,
+        il.sub(4,il.reg(4,'windowbase'),il.reg(4,LLIL_TEMP(22))),il.const(4,15))))
+    # The call-site ABI mapping restores caller logical registers on normal return.
+    il.append(il.ret(il.reg(4,LLIL_TEMP(20))))
+    il.mark_label(underflow)
+    il.append(il.set_reg(4,'ps',il.or_expr(4,il.or_expr(4,
+        il.and_expr(4,il.reg(4,'ps'),il.const(4,0xfffff0ff)),
+        il.shift_left(4,il.reg(4,LLIL_TEMP(21)),il.const(1,8))),il.const(4,16))))
+    il.append(il.set_reg(4,'epc1',il.const_pointer(4,address)))
+    rotate_bank(il,il.sub(4,il.reg(4,'windowbase'),il.reg(4,LLIL_TEMP(22))))
+    for increment, vector in ((1,4),(2,8)):
+        found,onward=LowLevelILLabel(),LowLevelILLabel()
+        il.append(il.if_expr(il.compare_equal(4,il.reg(4,LLIL_TEMP(22)),il.const(4,increment)),found,onward))
+        il.mark_label(found);il.append(il.jump(il.reg(4,'windowunderflow'+str(vector))));il.mark_label(onward)
+    il.append(il.jump(il.reg(4,'windowunderflow12')))

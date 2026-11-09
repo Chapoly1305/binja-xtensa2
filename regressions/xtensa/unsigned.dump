@@ -1,0 +1,39 @@
+
+/audit/unsigned.o:     file format elf32-xtensa-le
+
+
+Disassembly of section .text:
+
+00000000 <fp_conversion_probe>:
+   0:	ca2300        	float.s	f2, a3, 0
+   3:	ca2310        	float.s	f2, a3, 1
+   6:	ca2320        	float.s	f2, a3, 2
+   9:	ca2330        	float.s	f2, a3, 3
+   c:	ca2340        	float.s	f2, a3, 4
+   f:	ca2350        	float.s	f2, a3, 5
+  12:	ca2360        	float.s	f2, a3, 6
+  15:	ca2370        	float.s	f2, a3, 7
+  18:	ca2380        	float.s	f2, a3, 8
+  1b:	ca2390        	float.s	f2, a3, 9
+  1e:	ca23a0        	float.s	f2, a3, 10
+  21:	ca23b0        	float.s	f2, a3, 11
+  24:	ca23c0        	float.s	f2, a3, 12
+  27:	ca23d0        	float.s	f2, a3, 13
+  2a:	ca23e0        	float.s	f2, a3, 14
+  2d:	ca23f0        	float.s	f2, a3, 15
+  30:	da2300        	ufloat.s	f2, a3, 0
+  33:	da2310        	ufloat.s	f2, a3, 1
+  36:	da2320        	ufloat.s	f2, a3, 2
+  39:	da2330        	ufloat.s	f2, a3, 3
+  3c:	da2340        	ufloat.s	f2, a3, 4
+  3f:	da2350        	ufloat.s	f2, a3, 5
+  42:	da2360        	ufloat.s	f2, a3, 6
+  45:	da2370        	ufloat.s	f2, a3, 7
+  48:	da2380        	ufloat.s	f2, a3, 8
+  4b:	da2390        	ufloat.s	f2, a3, 9
+  4e:	da23a0        	ufloat.s	f2, a3, 10
+  51:	da23b0        	ufloat.s	f2, a3, 11
+  54:	da23c0        	ufloat.s	f2, a3, 12
+  57:	da23d0        	ufloat.s	f2, a3, 13
+  5a:	da23e0        	ufloat.s	f2, a3, 14
+  5d:	da23f0        	ufloat.s	f2, a3, 15

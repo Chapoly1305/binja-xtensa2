@@ -170,6 +170,15 @@ def disassemble_instruction(insn, addr):
     then we call disassemble_instruction with the returned instruction and the
     address it's loaded at.
     """
+    if getattr(insn, "mac_load_delta", None):
+        return _dis("inline0 inline1 inline2 inline3",
+                    lambda i, _: _get_reg_tok(i.mac_destination),
+                    lambda i, _: _get_reg_tok(i.mac_base),
+                    lambda i, _: _get_reg_tok(i.mac_left),
+                    lambda i, _: _get_reg_tok(i.mac_right))(insn, addr)
+    if getattr(insn, "mac_kind", None):
+        return _dis("inline0 inline1", lambda i, _: _get_reg_tok(i.mac_left),
+                    lambda i, _: _get_reg_tok(i.mac_right))(insn, addr)
     func = None
     try:
         func = globals()["_disassemble_" + insn.mnem.replace(".", "_")]
@@ -264,9 +273,9 @@ _disassemble_LOOPNEZ = _dis("as imm8")
 ############################################################
 ######### MAC16 Optzion #####################################
 ############################################################
-_disassemble_LDDEC = _dis("mw as")
-_disassemble_LDINC = _dis("mw as")
-# TODO: disasssemble rest of MAC16
+_disassemble_LDDEC = _dis("inline0 as", lambda insn, _: _get_reg_tok("m" + str(insn.r)))
+_disassemble_LDINC = _dis("inline0 as", lambda insn, _: _get_reg_tok("m" + str(insn.r)))
+# MAC16 arithmetic and compound loads are rendered from decoded operand roles.
 
 ############################################################
 ######### Miscellaneous Operations Option ##################

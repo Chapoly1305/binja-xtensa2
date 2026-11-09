@@ -1,3 +1,33 @@
+# BN-native Xtensa analysis
+
+This fork includes the MatterOverwatch Xtensa semantic repairs and the pinned
+native regression suite. The verified plugin payload is
+`454fe1913298fbbdaf508fcef803575b4bf8649bb87d35056579978627a70826`.
+Plugin source bytes and the regression manifest are preserved from that validation.
+
+The supported configuration and evidence boundaries are described in
+[SUPPORT.md](SUPPORT.md). Targeted tests do not establish complete ISA coverage
+or recognition accuracy on deployed firmware. The original native exit139
+cause remains unresolved.
+
+To run the native suite with a licensed Binary Ninja installation and Docker:
+
+```bash
+python3 tools/run_regressions.py \
+  --bn-install /absolute/path/binaryninja \
+  --bn-license /absolute/path/license.dat \
+  --image matteroverwatch-job-runner:latest \
+  --output-dir /absolute/path/new-output
+```
+
+The launcher verifies source/fixture hashes and uses a disposable container.
+The tested runtime is Binary Ninja 6.0.10905. See
+[regression details](regressions/xtensa/README.md).
+
+The original upstream documentation follows.
+
+---
+
 # binja-xtensa: Architecture Plugin Support and ESP8266 Loader
 
 Tensilica Xtensa Architecture Plugin Support and ESP8266 Firmware Loader for Binary Ninja.

@@ -1,0 +1,31 @@
+{
+  "status": "isolated register-index comparison candidate; regression/performance pending",
+  "upstream_repository": "https://github.com/nicabi/binja-xtensa2",
+  "upstream_commit": "0fa4e6440dce2d6465aafb2788def85e8632665f",
+  "source_checkpoint": "26c1a4050ae0 plus raw ELF declared-entry initialization helper",
+  "files": {
+    "LICENSE": "b7b0214f18b7ce96d38164f7655f22e3b633a3ed9a3a39053be745443c8661b7",
+    "__init__.py": "cbd99be7afeb1373e17daff82931cf04214967af4f960e83e2ed8c4009eb73cb",
+    "binja_xtensa/__init__.py": "2ecda8b4d075a0d80c4149312f18ce4d16826f576f9762697961dfc2ed65207d",
+    "binja_xtensa/ar_operands.py": "98821da913964e493192d9eba73168be41e28946b62c7a094ff7ce9be677b8ee",
+    "binja_xtensa/binaryview.py": "87633edf1cd105a8475a01c9e32b8f7e9a3eae0f219354114a6ee4ed172c9cb5",
+    "binja_xtensa/disassembly.py": "edd3e639a2d19bccf3d61624d3dc0281d7b229ca052bcf8e25aa411a522fb4db",
+    "binja_xtensa/firmware_parser.py": "004593c23626e4d137127b50af992ba7dd183989cfaab488374c36747037dcb7",
+    "binja_xtensa/fix_data.py": "86f0765d887487d49c0af573c00c8bfbfda767e37f4035d40139e09227a54bc3",
+    "binja_xtensa/general_exception.py": "836fe28cd33913e94947f95658aa91c260ae000d3c07cef320faacde20a0121e",
+    "binja_xtensa/instruction.py": "9513c1f63b8d0fe1e152903f8bcfc0e8e0d2e4c23f8bdfabce3fa96747a25918",
+    "binja_xtensa/known_symbols.py": "4649ebd2246ef14d2d0a6e1bba52c7618ddcf8cfd1b22dcb7657dbf51e46be77",
+    "binja_xtensa/lifter.py": "39d0c0491ba063a012f926ac1eafda0890d9678f836320b8c5ad0ccedda7ab17",
+    "binja_xtensa/loop_workflow.py": "e73e2ec0c4c6dbecb28f6c94b1eac5a0c4169eca98ef254c936020a19cbfc04d",
+    "binja_xtensa/parse_rom_ld.py": "011dc67368b9014b367b468852c76fab7ca59f994005903adbe932bf7406eb34",
+    "binja_xtensa/vector_profile.py": "9d1bae345de84c738036e0517a316c941220f4cbb64eeafc4739be222ac43b3b",
+    "binja_xtensa/window_bank.py": "01a07647f192911166e290571626fa4ea0c44fcdcc07d008303b02abdfc87ba3",
+    "binja_xtensa/window_exceptions.py": "9785ac9e71ca37fcdea7ff913cb09f307a4cefe9c7dc3be985b6706ac0df3495",
+    "plugin.json": "70c0179ed04178f4ea6b64f9863548dbc4c17c2dcb83dc6a60fb6b3630fd5b31",
+    "binja_xtensa/window_tail_workflow.py": "f52d8b420f7e30d042a9b4e5e923264743841155d836a2a8c6ab141a40c5f9e6",
+    "analysis_configuration.json": "7a305b7c740007cae976d0c1a0890eb7a437c53265ff59fa4e66e9fcd87e3a00",
+    "binja_xtensa/elf_entry.py": "93f4d9465e062683df017e2548fd30c0217609c2a6e5b3427868c0545fc16c74"
+  },
+  "payload_sha256": "454fe1913298fbbdaf508fcef803575b4bf8649bb87d35056579978627a70826",
+  "base_payload_sha256": "37403680047df6465a7c90d7b7a8b54f49bee5e3c3294514ce644404cca78bee"
+}

@@ -1,0 +1,39 @@
+
+/audit/trunc.o:     file format elf32-xtensa-le
+
+
+Disassembly of section .text:
+
+00000000 <trunc_probe>:
+   0:	9a2300        	trunc.s	a2, f3, 0
+   3:	9a2310        	trunc.s	a2, f3, 1
+   6:	9a2320        	trunc.s	a2, f3, 2
+   9:	9a2330        	trunc.s	a2, f3, 3
+   c:	9a2340        	trunc.s	a2, f3, 4
+   f:	9a2350        	trunc.s	a2, f3, 5
+  12:	9a2360        	trunc.s	a2, f3, 6
+  15:	9a2370        	trunc.s	a2, f3, 7
+  18:	9a2380        	trunc.s	a2, f3, 8
+  1b:	9a2390        	trunc.s	a2, f3, 9
+  1e:	9a23a0        	trunc.s	a2, f3, 10
+  21:	9a23b0        	trunc.s	a2, f3, 11
+  24:	9a23c0        	trunc.s	a2, f3, 12
+  27:	9a23d0        	trunc.s	a2, f3, 13
+  2a:	9a23e0        	trunc.s	a2, f3, 14
+  2d:	9a23f0        	trunc.s	a2, f3, 15
+  30:	ea2300        	utrunc.s	a2, f3, 0
+  33:	ea2310        	utrunc.s	a2, f3, 1
+  36:	ea2320        	utrunc.s	a2, f3, 2
+  39:	ea2330        	utrunc.s	a2, f3, 3
+  3c:	ea2340        	utrunc.s	a2, f3, 4
+  3f:	ea2350        	utrunc.s	a2, f3, 5
+  42:	ea2360        	utrunc.s	a2, f3, 6
+  45:	ea2370        	utrunc.s	a2, f3, 7
+  48:	ea2380        	utrunc.s	a2, f3, 8
+  4b:	ea2390        	utrunc.s	a2, f3, 9
+  4e:	ea23a0        	utrunc.s	a2, f3, 10
+  51:	ea23b0        	utrunc.s	a2, f3, 11
+  54:	ea23c0        	utrunc.s	a2, f3, 12
+  57:	ea23d0        	utrunc.s	a2, f3, 13
+  5a:	ea23e0        	utrunc.s	a2, f3, 14
+  5d:	ea23f0        	utrunc.s	a2, f3, 15
